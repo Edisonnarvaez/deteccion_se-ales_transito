@@ -113,3 +113,21 @@ streamlit run scripts/streamlit_app.py -- --model_path models/best_model.h5
 
 This `README.md` provides a comprehensive overview of your project, making it easy for users to understand its purpose and how to use it effectively. Let me know if you need further adjustments or additions!
 
+
+
+correr modelo Edison y Marino
+
+python -m venv venv
+.\venv\Scripts\activate
+
+pip install -r requirements.txt
+
+
+Streaminlit
+streamlit run scripts/streamlit_app.py
+
+con openCV
+python scripts/detect_and_classify.py 
+
+con asistente
+python scripts/assistant_streamlit.py 

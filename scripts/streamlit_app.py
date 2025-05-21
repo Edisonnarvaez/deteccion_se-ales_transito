@@ -1,41 +1,62 @@
 import streamlit as st
+import cv2
 import numpy as np
 import tensorflow as tf
-from PIL import Image
-import argparse
+import json
+from detector import TrafficSignDetector
 
-def run(args):
-    model_path = args.model_path
-    
-    print("----------- Starting Streamlit App -----------")
-    st.title("Traffic Sign Recognition App")
-    
-    # Load the model
-    print(f"Loading model from {model_path}...")
-    model = tf.keras.models.load_model(model_path)
-    
-    # File uploader
-    uploaded_file = st.file_uploader("Choose a traffic sign image...", type=["jpg", "png", "jpeg"])
-    if uploaded_file is not None:
-        # Display the uploaded image
-        image = Image.open(uploaded_file).resize((30, 30))
-        st.image(image, caption='Uploaded Image', use_column_width=True)
-        
-        # Preprocess the image
-        image_array = np.array(image) / 255.0
-        image_array = np.expand_dims(image_array, axis=0)
-        
-        # Predict the class
-        prediction = model.predict(image_array)
-        predicted_class = np.argmax(prediction, axis=1)[0]
-        
-        st.write(f"Predicted Class: {predicted_class}")
-        print(f"Predicted Class: {predicted_class}")
-    
-    print("----------- Streamlit App Running -----------")
+# Cargar descripciones
+with open('scripts/sign_info.json', 'r', encoding='utf-8') as f:
+    sign_info = json.load(f)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Streamlit App for Traffic Sign Recognition")
-    parser.add_argument('--model_path', type=str, default='models/best_model.h5', help='Path of the trained model')
-    args = parser.parse_args()
-    run(args)
+# Cargar modelos
+detector = TrafficSignDetector('yolov8n.pt')
+classifier = tf.keras.models.load_model('models/best_model.h5')
+
+def classify_sign(image_crop):
+    img = cv2.resize(image_crop, (30, 30))
+    img = img / 255.0
+    img = np.expand_dims(img, axis=0)
+    pred = classifier.predict(img)
+    return np.argmax(pred, axis=1)[0]
+
+st.title("Asistente de Señales de Tránsito en Tiempo Real")
+
+if "camera_started" not in st.session_state:
+    st.session_state.camera_started = False
+
+if st.button("Iniciar cámara"):
+    st.session_state.camera_started = True
+    st.session_state.cap = cv2.VideoCapture(0)
+
+if st.session_state.camera_started:
+    cap = st.session_state.cap
+    ret, frame = cap.read()
+    if not ret:
+        st.write("No se pudo acceder a la cámara.")
+    else:
+        detections = detector.detect(frame)
+        descriptions = []
+        for det in detections:
+            x1, y1, x2, y2, score, class_id = det
+            crop = frame[y1:y2, x1:x2]
+            if crop.size == 0:
+                continue
+            predicted_class = classify_sign(crop)
+            desc = sign_info.get(str(predicted_class), "Descripción no disponible.")
+            descriptions.append(f"Clase {predicted_class}: {desc}")
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0,255,0), 2)
+            cv2.putText(frame, f"{predicted_class}", (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 2)
+
+        st.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), channels="RGB")
+        if descriptions:
+            st.markdown("### Señales detectadas:")
+            for d in descriptions:
+                st.write(d)
+        else:
+            st.write("No se detectaron señales en este frame.")
+
+    if st.button("Detener cámara"):
+        cap.release()
+        st.session_state.camera_started = False
+        st.write("Cámara detenida.")
