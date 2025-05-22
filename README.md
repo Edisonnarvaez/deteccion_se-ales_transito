@@ -131,3 +131,6 @@ python scripts/detect_and_classify.py
 
 con asistente
 python scripts/assistant_streamlit.py 
+
+INTERFAZ QUE INTEGRACION DE LAS DIFERENTES FUNCIONES
+python scripts/integrated_traffic_sign_app
